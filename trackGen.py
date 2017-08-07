@@ -70,12 +70,12 @@ def fire(trkID):
     trueSix.append(vz)
     #print(trueSix)
     #print("%.1f" % x,"%.1f" % y,"%.1f" % z, "%.1f" % vx, "%.1f" % vy, "%.1f" % vz)
-    xm = x #+ ((random.random()-0.5) * 10)
-    ym = y  #+ ((random.random()-0.5) * 10)
-    zm = z  #+ ((random.random()-0.5) * 10)
-    vxm = vx #*  (1 + ((random.random()-0.5) / 50.0))
-    vym = vy #*  (1 + ((random.random()-0.5) / 50.0))  
-    vzm = vz # *  (1 + ((random.random()-0.5) / 50.0)) 
+    xm = x + ((random.random()-0.5) * 10)
+    ym = y + ((random.random()-0.5) * 10)
+    zm = z  + ((random.random()-0.5) * 10)
+    vxm = vx *  (1 + ((random.random()-0.5) / 50.0))
+    vym = vy *  (1 + ((random.random()-0.5) / 50.0))  
+    vzm = vz  *  (1 + ((random.random()-0.5) / 50.0)) 
     #rint(xm,x)
     measSix.append(xm)
     measSix.append(ym)
@@ -167,7 +167,7 @@ def datasetString(Values, rounder):
 def main():
   tf_maxmax, x_maxmax, y_maxmax, z_maxmax, vx_maxmax, vy_maxmax, vz_maxmax = 0,0,0,0,0,0,0
   tf, xmx, ymx, zmx,vxmx,vymx,vzmx = 0,0,0,0,0,0,0
-  for gg in range(0,1000):
+  for gg in range(0,100000):
     tf, xmx, ymx, zmx,vxmx,vymx,vzmx  = fire(gg)
     #pdb.set_trace()
     #dont need abd here b/c abs is coerced in fire()
