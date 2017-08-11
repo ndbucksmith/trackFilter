@@ -19,7 +19,7 @@ from tensorflow.contrib.learn.python.learn.datasets import base
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import random_seed
 
-
+trkFilScalers = [95000.0,95000.0,55000.0,2000.0,2000.0,2000.0]
 
 import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -170,34 +170,19 @@ def read_data_sets(train_dir,
   #print('size truess:' + str(numrecordspv6trues)
   assert numrecordspv6trues == numrecordspv6Inputs
   validation_size = int( 0.2 * len(trainSetIns))
-  #print('valdiationsize:' +str(validation_size))
-  #now scale to -1 to 1, magic numbers collected in track gen.py
-    #492 756157.522271 810653.565324 104353.717046
-  #e.g 491 803464.7 787912.7 98608.3
-  #now 479 745493.892057 791520.705135 100903.802122
-  #pdb.set_trace()
-  if scale:   #turn scaling on and off
+  scaleArray = [95000.0,95000.0,110000.0,2000.0,2000.0,2000.0]
+  
+  if scale:   #turn scaling on and off or between lin and log
     for bb in range(0,numrecordspv6Inputs):
-      trainSetIns[bb][0] = 0.5 + (trainSetIns[bb][0] / (95000*2))
-      trainSetIns[bb][1] = 0.5 + (trainSetIns[bb][1] / (95000*2))
-      trainSetIns[bb][2] = trainSetIns[bb][2] / 110000
-      trainSetIns[bb][3] = 0.5 + (trainSetIns[bb][3] / (2000*2))
-      trainSetIns[bb][4] = 0.5 + (trainSetIns[bb][4] / (2000*2))
-      trainSetIns[bb][5] = 0.5 + (trainSetIns[bb][5] / (2000*2))
-      trainSetIns[bb][6] = 0.5 + (trainSetIns[bb][6] / (90000*2))
-      trainSetIns[bb][7] = 0.5 + (trainSetIns[bb][7] / (90000*2))
-      trainSetIns[bb][8] = trainSetIns[bb][8] / 110000
-      trainSetIns[bb][9] = 0.5 + (trainSetIns[bb][9] / (2000*2))
-      trainSetIns[bb][10] = 0.5 + (trainSetIns[bb][10] / (2000*2))
-      trainSetIns[bb][11] = 0.5 + (trainSetIns[bb][11] / (2000*2))
-    
-      trainSetTrues[bb][0] = 0.5 + (trainSetTrues[bb][0] / (95000*2))
-      trainSetTrues[bb][1] = 0.5 + (trainSetTrues[bb][1] / (95000*2))
-      trainSetTrues[bb][2] = trainSetTrues[bb][2] / 110000
-      trainSetTrues[bb][3] = 0.5 + (trainSetTrues[bb][3] / (2000*2))
-      trainSetTrues[bb][4] = 0.5 + (trainSetTrues[bb][4] / (2000*2))
-      trainSetTrues[bb][5] = 0.5 + (trainSetTrues[bb][5] / (2000*2))
-    
+      trainSetIns[bb][0:6] = linearScale (trainSetIns[bb][0:6])
+      trainSetIns[bb][6:12] =  linearScale (trainSetIns[bb][6:12])
+      trainSetTrues[bb][0:6] = linearScale (trainSetTrues[bb][0:6])
+  else:
+    for bb in range(0,numrecordspv6Inputs): 
+      trainSetIns[bb][0:6] =  unipoleLogScale(rainSetIns[bb][0:6])
+      trainSetIns[bb][6:12] =  unipoleLogScale(rainSetIns[bb][6:12])
+      trainSetTrues[bb][0:6] =  unipoleLogScale(rainSetTrues[bb][0:6])
+  
   validation_pv6inputs = trainSetIns[:validation_size]
   validation_pv6trues = trainSetTrues[:validation_size]
   trainSetIns = trainSetIns[validation_size:]
@@ -217,7 +202,50 @@ def read_data_sets(train_dir,
       validation_pv6inputs, validation_pv6trues, dtype=dtype, reshape=reshape, seed=seed)
   test._num_examples=  validation_size
   return base.Datasets(train=train, validation=validation, test=test)
-
+  
+def unipoleLogScale(inArray):
+  outArray = []
+  for ee in range(3):
+    newVal = math.log(abs(inArray[ee])+1)
+    if inArray[ee] < 0:
+       newVal = -newVal
+    newVal = (math.log(trkFilScalers[ee]) + newVal)/(2 * math.log(trkFilScalers[ee]))
+    outArray.append(newVal) 
+  for rr in range(3):
+    newval = 0.5 + (inArray[rr+3] / (2000*2))
+    outArray.append(newVal) 
+  return outArray
+  
+def invLogScale(inArray):
+  outArray2 = []
+  for vv in range(3):
+   newVal2 =pow(10, (inArray[vv] * 2 * math.log(trkFilScalers[vv])) - math.log(trkFilScalers[vv]))
+   outArray2.append(newVal2)
+  for hh in range(3):
+    newVal2 = (inArray[hh] -0.5) * (trkFilScalers[hh]*2)
+    outArray2.append(newVal2)   
+  return  outArray2   
+  
+def invLinearScale(inArray):
+  outArray1 = []
+  for oo in range(6):
+    if oo == 2:
+      newVal1 = inArray[oo]  * (trkFilScalers[oo]*2)     
+    else:
+      newVal1 = (inArray[oo] -0.5) * (trkFilScalers[oo]*2)
+    outArray1.append(newVal1) 
+  return outArray1
+  
+def linearScale(inArray):
+  outArray1 = []
+  for oo in range(6):
+    if oo == 2:
+       newVal1 = inArray[oo] / (trkFilScalers[oo]*2)     
+    else:
+      newVal1 = (inArray[oo] / (trkFilScalers[oo]*2)) + 0.5
+    outArray1.append(newVal1) 
+  return outArray1
+   
 def datasetString(Values, rounder):
   strg = ""
   for kk in range(len(Values)):
@@ -305,6 +333,7 @@ def meanSquare(batch1, trues, idx,scale):
   #print("sum squares  " + str(round(sumSquares,rounder)))
     
 def main(scale):
+  restoreVars = True
   if scale:
     rounder = 5
   else:
@@ -318,42 +347,49 @@ def main(scale):
   with tf.name_scope('weights'):
     W_h1 = tf.Variable(tf.truncated_normal([12,24]))    #tf.truncated_normal
     variable_summaries(W_h1)
-    W_h2 = tf.Variable(tf.truncated_normal([24,20]))
+    W_h2 = tf.Variable(tf.truncated_normal([24,40]))
     variable_summaries(W_h2)
-    W_h3 = tf.Variable(tf.truncated_normal([20,20]))
+    W_h3 = tf.Variable(tf.truncated_normal([40,40]))
     variable_summaries(W_h3)
-    W_h4 = tf.Variable(tf.truncated_normal([20,20]))
+    W_h4 = tf.Variable(tf.truncated_normal([40,40]))
     variable_summaries(W_h4)
-    W_h5 = tf.Variable(tf.truncated_normal([20,20]))
+    W_h5 = tf.Variable(tf.truncated_normal([40,40]))
     variable_summaries(W_h5)
-    W = tf.Variable(tf.truncated_normal([20,6]))   
+    W = tf.Variable(tf.truncated_normal([40,6]))   
     variable_summaries(W)
   with tf.name_scope('biases'):
     b_h1 =    tf.Variable(tf.truncated_normal([24]))   
     variable_summaries(b_h1)  
-    b_h2 =    tf.Variable(tf.truncated_normal([20]))  
+    b_h2 =    tf.Variable(tf.truncated_normal([40]))  
     variable_summaries(b_h2)      
-    b_h3 =    tf.Variable(tf.truncated_normal([20]))  
+    b_h3 =    tf.Variable(tf.truncated_normal([40]))  
     variable_summaries(b_h3)  
-    b_h4 =    tf.Variable(tf.truncated_normal([20]))  
+    b_h4 =    tf.Variable(tf.truncated_normal([40]))  
     variable_summaries(b_h4)  
-    b_h5 =    tf.Variable(tf.truncated_normal([20]))  
+    b_h5 =    tf.Variable(tf.truncated_normal([40]))  
     variable_summaries(b_h5)  
     b = tf.Variable(tf.truncated_normal([6]))   
     variable_summaries(b)  
-  #merged = tf.summary.merge_all()
-  #train_writer = tf.summary.FileWriter('tboard', sess.graph)
+  saver = tf.train.Saver([W, b, W_h5, b_h5, W_h4, b_h4, W_h3, b_h3, W_h2, b_h2,  W_h1,  b_h1])
+
   sess.run(tf.global_variables_initializer())  
-  hidden1 = tf.nn.sigmoid(tf.matmul(measureds_ph, W_h1) + b_h1)
+  if restoreVars == True:
+    restoreStr = saver.restore(sess,'tmodel-wsum')
+
+  hidden1 = tf.sigmoid(tf.matmul(measureds_ph, W_h1) + b_h1)
   hidden2 = tf.nn.relu(tf.matmul(hidden1, W_h2) + b_h2)
-  hidden3 = tf.nn.sigmoid(tf.matmul(hidden2, W_h3) + b_h3)
+  hidden3 = tf.sigmoid(tf.matmul(hidden2, W_h3) + b_h3)
   hidden4 = tf.nn.relu(tf.matmul(hidden3, W_h4) + b_h4)
-  hidden5 = tf.nn.sigmoid(tf.matmul(hidden4, W_h5) + b_h5)
+  hidden5 = tf.sigmoid(tf.matmul(hidden4, W_h5) + b_h5)
   y_ = tf.matmul(hidden5,W) + b      
   #tf_loss = tf.losses.mean_squared_error(y_, trues_ph, weights=1.0, scope=None,)
   #tf_loss = tf.losses.mean_squared_error(y_, trues_ph, weights=1.0, scope=None,)
-  tf_loss = tf.reduce_mean(tf.square(y_- trues_ph)) # sum of the squares
+  with tf.name_scope('losses'):
+    tf_loss = tf.reduce_sum(tf.square(y_- trues_ph)) # sum of the squares
+    variable_summaries(tf_loss)  
   #tf_loss = tf.reduce_sum(tf.losses.log_loss(y_, trues_ph))
+  merged = tf.summary.merge_all()
+  train_writer = tf.summary.FileWriter('tboard', sess.graph)
   starter_learning_rate = 0.000002
   learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step,
                                            1000, 0.96, staircase=True)
@@ -369,7 +405,7 @@ def main(scale):
   minlossIteration = -1
   breakAtIteration = -1
   tferrcount = 0
-  for _ in range(15000000):   #try:
+  for _ in range(10):   #try:
     batch = nnTrackFilter.train.next_batch(100)
  #   except:
     #  tferrcount = tferrcount + 1
@@ -379,23 +415,20 @@ def main(scale):
       #break
     
     tstep , rmsVal = sess.run([train_step, tf_loss],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
-    if (_ > 1000000) and rmsVal > (200000):
-      y, trus= sess.run([ y_, trues_ph],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
-      meanSquare(trus, y, -1,scale)
-      print(batch[0])
-      print(y)
-      print(trus)
-      break
     if rmsVal < kilobatchMinLoss:
       kilobatchMinLoss = rmsVal
       kilobatchMinIt = _
     if rmsVal > kilobatchMaxLoss:
       kilobatchMaxLoss = rmsVal
       kilobatchMaxIt = _
+    if _ == breakAtIteration:
+        pdb.set_trace()
+        breakAtIteration = 201
+
     #print('iteration: ' + str(_) + '  loss:   {0:.5f}'.format(rmsVal))
-    if _ % 100000 == 1  and _ > 10:                  # print(tf.get_default_session().run(W))
-      print("kilobatch Min:{0:.5f}".format(kilobatchMinLoss) + " @ " +str(kilobatchMinIt))
-      print("kilobatch Max:{0:.5f}".format(kilobatchMaxLoss) + " @ " +str(kilobatchMaxIt))
+    if _ % 10000 == 1  and _ > 10:                  # print(tf.get_default_session().run(W))
+      print("100kBatch Min:{0:.5f}".format(kilobatchMinLoss) + " @ " +str(kilobatchMinIt))
+      print("100kBatch Max:{0:.5f}".format(kilobatchMaxLoss) + " @ " +str(kilobatchMaxIt))
       kilobatchMaxLoss = rmsVal
       kilobatchMinLoss = rmsVal
       kilobatchMaxIt = _
@@ -403,14 +436,11 @@ def main(scale):
       print('min loss: {0:.5f}'.format(minLoss) + '  @ iteration ' + str(minlossIteration))
       #train_step.run( feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
       #pdb.set_trace()
-      if _ == breakAtIteration:
-        pdb.set_trace()
-        breakAtIteration = 201
-        W1, W2, W0 = sess.run([W_h1, W_h2, W])
+
       #print('batch[1][1]:   ' + datasetString(batch[1][1],rounder)) , merged  , summary
-      y, trus= sess.run([ y_, trues_ph],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
+      y, trus, summary= sess.run([ y_, trues_ph, merged],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
       #try:
-        #train_writer.add_summary(summary, _)
+      train_writer.add_summary(summary, _)
       #except:
          #break     
       #print('iteration: ' + str(_) + '  loss:   {0:.5f}'.format(rmsVal))
@@ -431,12 +461,40 @@ def main(scale):
     #with tf.Session() as sesh:
     #  print(sesh.run(tf_loss))
   print('final loss: {0:.5f}'.format(rmsVal) + '  @ iteration ' + str(_)) 
-  print('max loss: {0:.5f}'.format(maxLoss) + '  @ iteration ' + str(maxLossIteration)) 
-  print('min loss: {0:.5f}'.format(minLoss) + '  @ iteration ' + str(minlossIteration))
-  print("tensorflow complete")
+  print('final max loss: {0:.5f}'.format(maxLoss) + '  @ iteration ' + str(maxLossIteration)) 
+  print('final min loss: {0:.5f}'.format(minLoss) + '  @ iteration ' + str(minlossIteration))
+
   accuracy = tf.reduce_mean(tf.square(y_- trues_ph))
-  print(accuracy.eval(feed_dict={measureds_ph : nnTrackFilter.validation[0], trues_ph:nnTrackFilter.validation[1]}))
+  batch = nnTrackFilter.validation.next_batch(1000)
+  acc, predicks, troos = sess.run([accuracy,y_, trues_ph],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
+  print('accuracy1k:' + str(acc))
+  filecsv = open('modperfs.csv', 'wb')
+  filecsvStr = ''
+  for mm in range(1000):
+    filecsvStr = filecsvStr  +  datasetString(invLinearScale(predicks[mm]),0)  + ',' + datasetString(invLinearScale(troos[mm]) , 0) + '\r\n'
+  filecsv.write(filecsvStr)
+  filecsv.close
   
+  batch = nnTrackFilter.validation.next_batch(100)
+  acc, predicks, troos = sess.run([accuracy,y_, trues_ph,],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
+  print('accuracy100:' + str(acc))
+  for mm in range(10):
+    print(datasetString(invLinearScale(predicks[mm]), 0))
+    print(datasetString(invLinearScale(troos[mm]), 0))
+  batch = nnTrackFilter.validation.next_batch(10)
+  acc, predicks, troos = sess.run([accuracy,y_, trues_ph,],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
+  print('accuracy10:' + str(acc))
+  for mm in range(10):
+    print(datasetString(invLinearScale(predicks[mm]), 0))
+    print(datasetString(invLinearScale(troos[mm]), 0))
+  batch = nnTrackFilter.validation.next_batch(10000)
+  acc, predicks, troos = sess.run([accuracy,y_, trues_ph,],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
+  print('accuracy10k:' + str(acc))
+  for mm in range(10):
+    print(datasetString(invLinearScale(predicks[mm]), 0))
+    print(datasetString(invLinearScale(troos[mm]), 0))
+  
+  saver.save(sess,"tmodel-wsum")
   
 if __name__ == "__main__":
    for dd in range(1):
@@ -444,154 +502,37 @@ if __name__ == "__main__":
   #codeModelTest(False)
 
 """
-20 million batches
+1 million batches
 
-iteration: 19999982  loss:   0.23028
-iteration: 19999983  loss:   0.26805
-iteration: 19999984  loss:   0.36295
-iteration: 19999985  loss:   0.16618
-iteration: 19999986  loss:   0.05845
-iteration: 19999987  loss:   0.10832
-iteration: 19999988  loss:   0.26115
-iteration: 19999989  loss:   0.27497
-iteration: 19999990  loss:   0.36136
-iteration: 19999991  loss:   0.26054
-iteration: 19999992  loss:   0.33312
-iteration: 19999993  loss:   0.65266
-iteration: 19999994  loss:   1.45064
-iteration: 19999995  loss:   2.27920
-iteration: 19999996  loss:   0.21031
-iteration: 19999997  loss:   0.22003
-iteration: 19999998  loss:   0.10072
-iteration: 19999999  loss:   0.15083
-final loss: 0.15083  @ iteration 19999999
-max loss: 211251344.00000  @ iteration 1774
-min loss: 0.00599  @ iteration 8134017 
-
-random batch error with high loss
-
-teration: 19995317  loss:   0.26882
-iteration: 19995318  loss:   0.13679
-iteration: 19995319  loss:   0.04436
-iteration: 19995320  loss:   210895040.00000
-iteration: 19995321  loss:   0.22946
-
-
-iteration: 19997092  loss:   0.25688
-iteration: 19997093  loss:   0.09132
-iteration: 19997094  loss:   210895008.00000
-iteration: 19997095  loss:   0.88555
-iteration: 19997096  loss:   0.22343
-
-  File "trkFilt.py", line 407, in <module>
-    main(True)
-  File "trkFilt.py", line 358, in main
-    batch = nnTrackFilter.train.next_batch(100)
-  File "trkFilt.py", line 109, in next_batch
-
-
-    return numpy.concatenate((pv6inputs_rest_part, pv6inputs_new_part), axis=0) , numpy.concatenate((pv6trues_rest_part, pv6trues_new_part), axis=0)
-ValueError: all the input arrays must have same number of dimensions
-
-iteration: 19999904  loss:   0.20500
-iteration: 19999905  loss:   0.31319
-iteration: 19999906  loss:   0.20337
-iteration: 19999907  loss:   0.15201
-iteration: 19999908  loss:   0.22272
-iteration: 19999909  loss:   0.17528
-iteration: 19999910  loss:   0.19620
-iteration: 19999911  loss:   0.17449
-iteration: 19999912  loss:   0.11097
-iteration: 19999913  loss:   0.18484
-iteration: 19999914  loss:   0.16977
-iteration: 19999915  loss:   0.19189
-iteration: 19999916  loss:   0.16953
-iteration: 19999917  loss:   0.20327
-iteration: 19999918  loss:   0.21833
-iteration: 19999919  loss:   0.19008
-iteration: 19999920  loss:   0.20630
-iteration: 19999921  loss:   0.09273
-iteration: 19999922  loss:   0.20800
-iteration: 19999923  loss:   0.17844
-iteration: 19999924  loss:   0.14656
-iteration: 19999925  loss:   0.09878
-iteration: 19999926  loss:   0.18845
-iteration: 19999927  loss:   0.16315
-iteration: 19999928  loss:   0.09006
-iteration: 19999929  loss:   0.08358
-iteration: 19999930  loss:   0.20110
-iteration: 19999931  loss:   0.20126
-iteration: 19999932  loss:   0.14910
-iteration: 19999933  loss:   0.11258
-iteration: 19999934  loss:   0.18462
-iteration: 19999935  loss:   0.14709
-iteration: 19999936  loss:   0.24407
-iteration: 19999937  loss:   0.13956
-iteration: 19999938  loss:   0.18188
-iteration: 19999939  loss:   0.17433
-iteration: 19999940  loss:   0.20541
-iteration: 19999941  loss:   0.20837
-iteration: 19999942  loss:   0.21422
-iteration: 19999943  loss:   0.33184
-iteration: 19999944  loss:   0.23295
-iteration: 19999945  loss:   0.20810
-iteration: 19999946  loss:   0.15342
-iteration: 19999947  loss:   0.21541
-iteration: 19999948  loss:   0.12583
-iteration: 19999949  loss:   0.05958
-iteration: 19999950  loss:   0.26927
-iteration: 19999951  loss:   0.44983
-iteration: 19999952  loss:   1.10761
-iteration: 19999953  loss:   2.54100
-iteration: 19999954  loss:   1.88901
-iteration: 19999955  loss:   0.09317
-iteration: 19999956  loss:   0.12837
-iteration: 19999957  loss:   0.10149
-iteration: 19999958  loss:   0.18510
-iteration: 19999959  loss:   0.17733
-iteration: 19999960  loss:   0.12423
-iteration: 19999961  loss:   0.01901
-iteration: 19999962  loss:   0.12834
-iteration: 19999963  loss:   0.16585
-iteration: 19999964  loss:   0.09141
-iteration: 19999965  loss:   0.17648
-iteration: 19999966  loss:   0.08462
-iteration: 19999967  loss:   0.16205
-iteration: 19999968  loss:   0.21487
-iteration: 19999969  loss:   0.18580
-iteration: 19999970  loss:   0.20264
-iteration: 19999971  loss:   0.16818
-iteration: 19999972  loss:   0.23614
-iteration: 19999973  loss:   0.11995
-iteration: 19999974  loss:   0.17997
-iteration: 19999975  loss:   0.20676
-iteration: 19999976  loss:   0.17369
-iteration: 19999977  loss:   0.03121
-iteration: 19999978  loss:   0.06648
-iteration: 19999979  loss:   0.19389
-iteration: 19999980  loss:   0.14734
-iteration: 19999981  loss:   0.22006
-iteration: 19999982  loss:   0.14954
-iteration: 19999983  loss:   0.21362
-iteration: 19999984  loss:   0.24585
-iteration: 19999985  loss:   0.54927
-iteration: 19999986  loss:   1.31744
-iteration: 19999987  loss:   0.80702
-iteration: 19999988  loss:   0.14248
-iteration: 19999989  loss:   0.18895
-iteration: 19999990  loss:   0.19018
-iteration: 19999991  loss:   0.22531
-iteration: 19999992  loss:   0.19311
-iteration: 19999993  loss:   0.33080
-iteration: 19999994  loss:   0.27917
-iteration: 19999995  loss:   0.10400
-iteration: 19999996  loss:   0.17440
-iteration: 19999997  loss:   0.18982
-iteration: 19999998  loss:   0.16505
-iteration: 19999999  loss:   0.33884
-final loss: 0.33884  @ iteration 19999999
-max loss: 211248496.00000  @ iteration 1774
-min loss: 0.00278  @ iteration 15279108
+100kBatch Min:0.00247 @ 9235524
+100kBatch Max:1.52284 @ 9237758
+min loss: 0.00245  @ iteration 8392532
+100kBatch Min:0.00248 @ 9324260
+100kBatch Max:1.51984 @ 9326494
+min loss: 0.00245  @ iteration 8392532
+100kBatch Min:0.00248 @ 9412996
+100kBatch Max:1.51687 @ 9415230
+min loss: 0.00245  @ iteration 8392532
+100kBatch Min:0.00249 @ 9501732
+100kBatch Max:1.51390 @ 9503966
+min loss: 0.00245  @ iteration 8392532
+100kBatch Min:0.00250 @ 9634836
+100kBatch Max:1.50950 @ 9637070
+min loss: 0.00245  @ iteration 8392532
+100kBatch Min:0.00251 @ 9723572
+100kBatch Max:1.50660 @ 9725806
+min loss: 0.00245  @ iteration 8392532
+100kBatch Min:0.00251 @ 9812308
+100kBatch Max:1.50371 @ 9814542
+min loss: 0.00245  @ iteration 8392532
+final loss: 0.01102  @ iteration 9999999
+max loss: 6.93543  @ iteration 340
+min loss: 0.00245  @ iteration 8392532
+tensorflow complete
+accuracy1k:[0.013362693]
+accuracy100:[0.011243958]
+accuracy10:[0.043907799]
+accuracy10k:[0.025602074]
 
 
 

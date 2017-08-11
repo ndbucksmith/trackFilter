@@ -1,0 +1,18 @@
+
+
+# Compiled source #
+*.pyc
+
+
+# Logs and databases #
+*.log
+
+#js build files#
+
+
+#virtual env#
+venv
+
+# data and logs #
+tboard
+tracks
