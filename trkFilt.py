@@ -19,7 +19,7 @@ from tensorflow.contrib.learn.python.learn.datasets import base
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import random_seed
 
-trkFilScalers = [95000.0,95000.0,55000.0,2000.0,2000.0,2000.0]
+trkFilScalers = [97500.0,97500.0,56000.0,2000.0,2000.0,2000.0]
 
 import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -137,7 +137,7 @@ def read_data_sets(train_dir,
   numrecordspv6trues = 0
   trainSetIns = []
   trainSetTrues = []
-  for ti in range(0, 1000):
+  for ti in range(0, 8000):
     fninp = 'tracks/Inp-' + str(ti) + '.trk'
     fntru = 'tracks/Tru-' + str(ti) + '.trk'
     fncsv = 'tracks/Trk-' + str(ti) + '.csv'
@@ -172,16 +172,16 @@ def read_data_sets(train_dir,
   validation_size = int( 0.2 * len(trainSetIns))
   scaleArray = [95000.0,95000.0,110000.0,2000.0,2000.0,2000.0]
   
-  if scale:   #turn scaling on and off or between lin and log
+  if scale == 'lin':   #turn scaling on and off or between lin and log
     for bb in range(0,numrecordspv6Inputs):
       trainSetIns[bb][0:6] = linearScale (trainSetIns[bb][0:6])
       trainSetIns[bb][6:12] =  linearScale (trainSetIns[bb][6:12])
       trainSetTrues[bb][0:6] = linearScale (trainSetTrues[bb][0:6])
   else:
     for bb in range(0,numrecordspv6Inputs): 
-      trainSetIns[bb][0:6] =  unipoleLogScale(rainSetIns[bb][0:6])
-      trainSetIns[bb][6:12] =  unipoleLogScale(rainSetIns[bb][6:12])
-      trainSetTrues[bb][0:6] =  unipoleLogScale(rainSetTrues[bb][0:6])
+      trainSetIns[bb][0:6] =  unipoleLogScale(trainSetIns[bb][0:6])
+      trainSetIns[bb][6:12] =  unipoleLogScale(trainSetIns[bb][6:12])
+      trainSetTrues[bb][0:6] =  unipoleLogScale(trainSetTrues[bb][0:6])
   
   validation_pv6inputs = trainSetIns[:validation_size]
   validation_pv6trues = trainSetTrues[:validation_size]
@@ -206,23 +206,27 @@ def read_data_sets(train_dir,
 def unipoleLogScale(inArray):
   outArray = []
   for ee in range(3):
-    newVal = math.log(abs(inArray[ee])+1)
+    newVal = math.log(abs(inArray[ee])+1,10)
     if inArray[ee] < 0:
        newVal = -newVal
-    newVal = (math.log(trkFilScalers[ee]) + newVal)/(2 * math.log(trkFilScalers[ee]))
+    newVal = (math.log(trkFilScalers[ee],10) + newVal)/(2 * math.log(trkFilScalers[ee],10))
     outArray.append(newVal) 
   for rr in range(3):
-    newval = 0.5 + (inArray[rr+3] / (2000*2))
+    newVal = (inArray[rr+3] / (trkFilScalers[rr+3]*2)) + 0.5
     outArray.append(newVal) 
   return outArray
   
 def invLogScale(inArray):
   outArray2 = []
   for vv in range(3):
-   newVal2 =pow(10, (inArray[vv] * 2 * math.log(trkFilScalers[vv])) - math.log(trkFilScalers[vv]))
-   outArray2.append(newVal2)
+    valtoPow = (inArray[vv] * 2 * math.log(trkFilScalers[vv],10)) - math.log(trkFilScalers[vv],10) 
+    if valtoPow > 0:
+      newVal2 =pow(10, abs(valtoPow)) -1
+    else:
+      newVal2 = -pow(10, abs(valtoPow)) +1
+    outArray2.append(newVal2)
   for hh in range(3):
-    newVal2 = (inArray[hh] -0.5) * (trkFilScalers[hh]*2)
+    newVal2 = (inArray[hh+3] -0.5) * (trkFilScalers[hh+3]*2)
     outArray2.append(newVal2)   
   return  outArray2   
   
@@ -256,7 +260,7 @@ def datasetString(Values, rounder):
 def codeModelTest(scale):  #make a simple postion velocity projector in python and test sum square loss
   nnTrackFilter = read_data_sets('tracks', scale = scale)
   maxSumSq = 0
-  if scale:
+  if scale == 'lin':
     formatStr = "{0:.5f} {0:.5f} {0:.5f} {0:.5f} {0:.5f} {0:.5f}"
     rounder = 5
   else:
@@ -301,7 +305,7 @@ def variable_summaries(var):
 
 
 def meanSquare(batch1, trues, idx,scale):
-  if scale:
+  if scale == 'lin':
     rounder = 5
   else:
     rounder = 0
@@ -332,9 +336,9 @@ def meanSquare(batch1, trues, idx,scale):
   print("mean squares  " + str(round(meanSumSquares,rounder)))
   #print("sum squares  " + str(round(sumSquares,rounder)))
     
-def main(scale):
+def main(scale, modelName):
   restoreVars = True
-  if scale:
+  if scale == 'lin':
     rounder = 5
   else:
     rounder = 0
@@ -374,14 +378,21 @@ def main(scale):
 
   sess.run(tf.global_variables_initializer())  
   if restoreVars == True:
-    restoreStr = saver.restore(sess,'tmodel-wsum')
-
-  hidden1 = tf.sigmoid(tf.matmul(measureds_ph, W_h1) + b_h1)
-  hidden2 = tf.nn.relu(tf.matmul(hidden1, W_h2) + b_h2)
-  hidden3 = tf.sigmoid(tf.matmul(hidden2, W_h3) + b_h3)
-  hidden4 = tf.nn.relu(tf.matmul(hidden3, W_h4) + b_h4)
-  hidden5 = tf.sigmoid(tf.matmul(hidden4, W_h5) + b_h5)
-  y_ = tf.matmul(hidden5,W) + b      
+    restoreStr = saver.restore(sess, modelName + scale)
+  if modelName ==  '5sig1matmul':
+    hidden1 = tf.sigmoid(tf.matmul(measureds_ph, W_h1) + b_h1)
+    hidden2 = tf.sigmoid(tf.matmul(hidden1, W_h2) + b_h2)
+    hidden3 = tf.sigmoid(tf.matmul(hidden2, W_h3) + b_h3)
+    hidden4 = tf.sigmoid(tf.matmul(hidden3, W_h4) + b_h4)
+    hidden5 = tf.sigmoid(tf.matmul(hidden4, W_h5) + b_h5)
+    y_ = (tf.matmul(hidden5,W) + b)
+  elif  modelName ==  '5sigrelu1matmul':   
+    hidden1 = tf.sigmoid(tf.matmul(measureds_ph, W_h1) + b_h1)
+    hidden2 = tf.nn.relu(tf.matmul(hidden1, W_h2) + b_h2)
+    hidden3 = tf.sigmoid(tf.matmul(hidden2, W_h3) + b_h3)
+    hidden4 = tf.nn.relu(tf.matmul(hidden3, W_h4) + b_h4)
+    hidden5 = tf.sigmoid(tf.matmul(hidden4, W_h5) + b_h5)
+    y_ = (tf.matmul(hidden5,W) + b)
   #tf_loss = tf.losses.mean_squared_error(y_, trues_ph, weights=1.0, scope=None,)
   #tf_loss = tf.losses.mean_squared_error(y_, trues_ph, weights=1.0, scope=None,)
   with tf.name_scope('losses'):
@@ -398,6 +409,7 @@ def main(scale):
   
   #pdb.set_trace()s
   kilobatchMinLoss  =  1000000
+  kilobatchMinIt = -1
   kilobatchMaxLoss = 0
   maxLoss = 0
   maxLossIteration = -1
@@ -405,7 +417,7 @@ def main(scale):
   minlossIteration = -1
   breakAtIteration = -1
   tferrcount = 0
-  for _ in range(10):   #try:
+  for _ in range(50000):   #try:
     batch = nnTrackFilter.train.next_batch(100)
  #   except:
     #  tferrcount = tferrcount + 1
@@ -426,9 +438,9 @@ def main(scale):
         breakAtIteration = 201
 
     #print('iteration: ' + str(_) + '  loss:   {0:.5f}'.format(rmsVal))
-    if _ % 10000 == 1  and _ > 10:                  # print(tf.get_default_session().run(W))
-      print("100kBatch Min:{0:.5f}".format(kilobatchMinLoss) + " @ " +str(kilobatchMinIt))
-      print("100kBatch Max:{0:.5f}".format(kilobatchMaxLoss) + " @ " +str(kilobatchMaxIt))
+    if _ % 50000 == 1  and _ > 10:                  # print(tf.get_default_session().run(W))
+      print("kBatch Min:{0:.5f}".format(kilobatchMinLoss) + " @ " +str(kilobatchMinIt))
+      print("kBatch Max:{0:.5f}".format(kilobatchMaxLoss) + " @ " +str(kilobatchMaxIt))
       kilobatchMaxLoss = rmsVal
       kilobatchMinLoss = rmsVal
       kilobatchMaxIt = _
@@ -452,6 +464,8 @@ def main(scale):
     if rmsVal > maxLoss:
         maxLoss = rmsVal
         maxLossIteration = _
+    if (_  -  minlossIteration) > 500000:
+      break
       #print('sum Square:',  str(pisumSq))
       #pims = (pisumSq/6)
       #print('pi-mean-Sq: {0:.3f}'.format(pims))
@@ -465,43 +479,75 @@ def main(scale):
   print('final min loss: {0:.5f}'.format(minLoss) + '  @ iteration ' + str(minlossIteration))
 
   accuracy = tf.reduce_mean(tf.square(y_- trues_ph))
+  batch = nnTrackFilter.validation.next_batch(10000)
+  acc, predicks, troos = sess.run([accuracy,y_, trues_ph,],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
+  print('accuracy10k:' + str(acc))
+  if scale == 'lin':
+    for mm in range(10):
+      print(datasetString(invLinearScale(predicks[mm]), 0))
+      print(datasetString(invLinearScale(troos[mm]), 0))
+  else:
+    for mm in range(10):         
+      print(datasetString(invLogScale(predicks[mm]), 0))
+      print(datasetString(invLogScale(troos[mm]), 0))        
   batch = nnTrackFilter.validation.next_batch(1000)
   acc, predicks, troos = sess.run([accuracy,y_, trues_ph],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
   print('accuracy1k:' + str(acc))
-  filecsv = open('modperfs.csv', 'wb')
+  filecsvName = modelName + scale + '.csv'
+  filecsv = open(filecsvName, 'wb')
   filecsvStr = ''
-  for mm in range(1000):
-    filecsvStr = filecsvStr  +  datasetString(invLinearScale(predicks[mm]),0)  + ',' + datasetString(invLinearScale(troos[mm]) , 0) + '\r\n'
+  if scale =='lin':
+    for mm in range(1000):
+      filecsvStr = filecsvStr  +  datasetString(invLinearScale(predicks[mm]),0)  + ',' + datasetString(invLinearScale(troos[mm]) , 0) + '\r\n'
+  else:  
+    for mm in range(1000):
+       filecsvStr = filecsvStr  +  datasetString(invLogScale(predicks[mm]),0)  + ',' + datasetString(invLogScale(troos[mm]) , 0) + '\r\n'
   filecsv.write(filecsvStr)
   filecsv.close
   
   batch = nnTrackFilter.validation.next_batch(100)
   acc, predicks, troos = sess.run([accuracy,y_, trues_ph,],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
   print('accuracy100:' + str(acc))
-  for mm in range(10):
-    print(datasetString(invLinearScale(predicks[mm]), 0))
-    print(datasetString(invLinearScale(troos[mm]), 0))
+  if scale == 'lin':
+    for mm in range(10):
+      print(datasetString(invLinearScale(predicks[mm]), 0))
+      print(datasetString(invLinearScale(troos[mm]), 0))
+  else:
+    for mm in range(10):
+      print(datasetString(invLogScale(predicks[mm]), 0))
+      print(datasetString(invLogScale(troos[mm]), 0))
   batch = nnTrackFilter.validation.next_batch(10)
   acc, predicks, troos = sess.run([accuracy,y_, trues_ph,],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
   print('accuracy10:' + str(acc))
-  for mm in range(10):
-    print(datasetString(invLinearScale(predicks[mm]), 0))
-    print(datasetString(invLinearScale(troos[mm]), 0))
-  batch = nnTrackFilter.validation.next_batch(10000)
-  acc, predicks, troos = sess.run([accuracy,y_, trues_ph,],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
-  print('accuracy10k:' + str(acc))
-  for mm in range(10):
-    print(datasetString(invLinearScale(predicks[mm]), 0))
-    print(datasetString(invLinearScale(troos[mm]), 0))
+  if scale == 'lin':
+    for mm in range(10):
+      print(datasetString(invLinearScale(predicks[mm]), 0))
+      print(datasetString(invLinearScale(troos[mm]), 0))
+  else:
+     print(datasetString(invLogScale(predicks[mm]), 0))
+     print(datasetString(invLogScale(troos[mm]), 0))         
+
+  saver.save(sess,modelName + scale)
   
-  saver.save(sess,"tmodel-wsum")
+def testLogScale():
+  kk = unipoleLogScale([-8000, 60000,45, 80, 90, 100])
+  print(kk)
+  print(invLogScale(kk))
   
 if __name__ == "__main__":
-   for dd in range(1):
-    main(True)
+  for dd in range(1):
+    main('log','5sig1matmul')
   #codeModelTest(False)
 
 """
+lin','5sig1matmul'
+kBatch Min:0.08303 @ 964648
+kBatch Max:117.84129 @ 977063
+min loss: 0.05423  @ iteration 549316
+final loss: 30.18925  @ iteration 1049317
+final max loss: 4845.82324  @ iteration 0
+final min loss: 0.05423  @ iteration 549316
+
 1 million batches
 
 100kBatch Min:0.00247 @ 9235524

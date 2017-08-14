@@ -46,14 +46,14 @@ def fire(trkID):
   vx,vy,vz = 0,0,0  #true velocitys
   vxm,vym,vzm = 0,0,0  #measured velocitys
   vx0,vy0,vz0 = 0,0,0  #previous true velocity-
-  for ti in range(1, 1000):
+  for ti in range(0, 1000):
     trueSix = []
     measSix = []
     vx0,vy0,vz0 =  vx,vy,vz 
     if ti < ft:   #firing
       vz = vz + math.sin(at/57.295) * ac
       vx = vx +math.sin(az/57.295) *  ac
-      vy = vz + math.cos(az/57.295) * ac
+      vy = vy + math.cos(az/57.295) * ac
     else:   # coasting
       if vz >  - 250:  #terminal velocity
         vz = vz - 32.2
