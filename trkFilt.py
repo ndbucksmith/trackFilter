@@ -19,7 +19,11 @@ from tensorflow.contrib.learn.python.learn.datasets import base
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import random_seed
 
-trkFilScalers = [97500.0,97500.0,56000.0,2000.0,2000.0,2000.0]
+#fireTime, max positions:560.0, 979698.13, 969310.95, 111461.39
+#max velcoties:  1906.4, 1915.78, 1882.07
+
+
+trkFilScalers = [98000.0,98000.0,56000.0,2000.0,2000.0,2000.0, 300]
 
 import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -132,7 +136,7 @@ def read_data_sets(train_dir,
                    reshape=True,
                    validation_size=5000,
                    seed=None,
-                   scale = True):
+                   scale = 'lin'):
   numrecordspv6Inputs =0
   numrecordspv6trues = 0
   trainSetIns = []
@@ -151,7 +155,7 @@ def read_data_sets(train_dir,
     y = pickle.load(filtru)
     #print(x[0][0],y[0][0])
     for pp in range(0,(len(x)-1)):
-      trainSetIns.append(x[pp])
+      trainSetIns.append(x[pp][0:14])
       trainSetTrues.append(y[pp])
       rowStr =""
       for qq in range(6,9):
@@ -170,12 +174,12 @@ def read_data_sets(train_dir,
   #print('size truess:' + str(numrecordspv6trues)
   assert numrecordspv6trues == numrecordspv6Inputs
   validation_size = int( 0.2 * len(trainSetIns))
-  scaleArray = [95000.0,95000.0,110000.0,2000.0,2000.0,2000.0]
+
   
   if scale == 'lin':   #turn scaling on and off or between lin and log
     for bb in range(0,numrecordspv6Inputs):
-      trainSetIns[bb][0:6] = linearScale (trainSetIns[bb][0:6])
-      trainSetIns[bb][6:12] =  linearScale (trainSetIns[bb][6:12])
+      trainSetIns[bb][0:7] = linearScale (trainSetIns[bb][0:7])
+      trainSetIns[bb][8:14] =  linearScale (trainSetIns[bb][8:14])
       trainSetTrues[bb][0:6] = linearScale (trainSetTrues[bb][0:6])
   else:
     for bb in range(0,numrecordspv6Inputs): 
@@ -232,7 +236,7 @@ def invLogScale(inArray):
   
 def invLinearScale(inArray):
   outArray1 = []
-  for oo in range(6):
+  for oo in range(len(inArray)):
     if oo == 2:
       newVal1 = inArray[oo]  * (trkFilScalers[oo]*2)     
     else:
@@ -242,7 +246,7 @@ def invLinearScale(inArray):
   
 def linearScale(inArray):
   outArray1 = []
-  for oo in range(6):
+  for oo in range(len(inArray)):
     if oo == 2:
        newVal1 = inArray[oo] / (trkFilScalers[oo]*2)     
     else:
@@ -345,11 +349,11 @@ def main(scale, modelName):
   nnTrackFilter = read_data_sets('tracks', scale = scale)
   sess = tf.Session()
   global_step = tf.Variable(0, trainable=False)
-  measureds_ph = tf.placeholder(tf.float32, shape=(None,12))
+  measureds_ph = tf.placeholder(tf.float32, shape=(None,14))
   trues_ph = tf.placeholder(tf.float32, shape=(None,6))
   #pdb.set_trace()
   with tf.name_scope('weights'):
-    W_h1 = tf.Variable(tf.truncated_normal([12,24]))    #tf.truncated_normal
+    W_h1 = tf.Variable(tf.truncated_normal([14,24]))    #tf.truncated_normal
     variable_summaries(W_h1)
     W_h2 = tf.Variable(tf.truncated_normal([24,40]))
     variable_summaries(W_h2)
@@ -359,6 +363,12 @@ def main(scale, modelName):
     variable_summaries(W_h4)
     W_h5 = tf.Variable(tf.truncated_normal([40,40]))
     variable_summaries(W_h5)
+    W_h6 = tf.Variable(tf.truncated_normal([40,40]))
+    variable_summaries(W_h6)
+    W_h7 = tf.Variable(tf.truncated_normal([40,40]))
+    variable_summaries(W_h7)
+    W_h8 = tf.Variable(tf.truncated_normal([40,40]))
+    variable_summaries(W_h8)
     W = tf.Variable(tf.truncated_normal([40,6]))   
     variable_summaries(W)
   with tf.name_scope('biases'):
@@ -372,27 +382,45 @@ def main(scale, modelName):
     variable_summaries(b_h4)  
     b_h5 =    tf.Variable(tf.truncated_normal([40]))  
     variable_summaries(b_h5)  
+    b_h6 = tf.Variable(tf.truncated_normal([40]))
+    variable_summaries(b_h6)
+    b_h7 = tf.Variable(tf.truncated_normal([40]))
+    variable_summaries(b_h7)
+    b_h8 = tf.Variable(tf.truncated_normal([40]))
+    variable_summaries(b_h8)
     b = tf.Variable(tf.truncated_normal([6]))   
     variable_summaries(b)  
-  saver = tf.train.Saver([W, b, W_h5, b_h5, W_h4, b_h4, W_h3, b_h3, W_h2, b_h2,  W_h1,  b_h1])
+  saver = tf.train.Saver([W, b, W_h8, b_h8, W_h7, b_h7, W_h6, b_h6, W_h5, b_h5, W_h4, b_h4, W_h3, b_h3, W_h2, b_h2,  W_h1,  b_h1])
 
   sess.run(tf.global_variables_initializer())  
   if restoreVars == True:
     restoreStr = saver.restore(sess, modelName + scale)
-  if modelName ==  '5sig1matmul':
+  if modelName ==  '8sig1matmul':
     hidden1 = tf.sigmoid(tf.matmul(measureds_ph, W_h1) + b_h1)
     hidden2 = tf.sigmoid(tf.matmul(hidden1, W_h2) + b_h2)
     hidden3 = tf.sigmoid(tf.matmul(hidden2, W_h3) + b_h3)
     hidden4 = tf.sigmoid(tf.matmul(hidden3, W_h4) + b_h4)
     hidden5 = tf.sigmoid(tf.matmul(hidden4, W_h5) + b_h5)
-    y_ = (tf.matmul(hidden5,W) + b)
+    hidden6 = tf.sigmoid(tf.matmul(hidden5, W_h6) + b_h6)
+    hidden7 = tf.sigmoid(tf.matmul(hidden6, W_h7) + b_h7)
+    hidden8 = tf.sigmoid(tf.matmul(hidden7, W_h8) + b_h8)
+    y_ = (tf.matmul(hidden8,W) + b)
+  elif  modelName ==  '4sig1matmul':   
+    hidden1 = tf.sigmoid(tf.matmul(measureds_ph, W_h1) + b_h1)
+    hidden2 = tf.nn.relu(tf.matmul(hidden1, W_h2) + b_h2)
+    hidden3 = tf.sigmoid(tf.matmul(hidden2, W_h3) + b_h3)
+    hidden4 = tf.nn.relu(tf.matmul(hidden3, W_h4) + b_h4)
+    y_ = (tf.matmul(hidden4,W) + b)
   elif  modelName ==  '5sigrelu1matmul':   
     hidden1 = tf.sigmoid(tf.matmul(measureds_ph, W_h1) + b_h1)
     hidden2 = tf.nn.relu(tf.matmul(hidden1, W_h2) + b_h2)
     hidden3 = tf.sigmoid(tf.matmul(hidden2, W_h3) + b_h3)
     hidden4 = tf.nn.relu(tf.matmul(hidden3, W_h4) + b_h4)
     hidden5 = tf.sigmoid(tf.matmul(hidden4, W_h5) + b_h5)
-    y_ = (tf.matmul(hidden5,W) + b)
+    hidden6 = tf.sigmoid(tf.matmul(hidden5, W_h6) + b_h6)
+    hidden7 = tf.nn.relu(tf.matmul(hidden6, W_h7) + b_h7)
+    hidden8 = tf.sigmoid(tf.matmul(hidden7, W_h8) + b_h8)
+    y_ = (tf.matmul(hidden8,W) + b)
   #tf_loss = tf.losses.mean_squared_error(y_, trues_ph, weights=1.0, scope=None,)
   #tf_loss = tf.losses.mean_squared_error(y_, trues_ph, weights=1.0, scope=None,)
   with tf.name_scope('losses'):
@@ -411,13 +439,15 @@ def main(scale, modelName):
   kilobatchMinLoss  =  1000000
   kilobatchMinIt = -1
   kilobatchMaxLoss = 0
+  kilobatchMinMaxLoss = 1000000
+  kilobatchMinMaxIt = -1
   maxLoss = 0
   maxLossIteration = -1
   minLoss = 1000000000000
   minlossIteration = -1
   breakAtIteration = -1
   tferrcount = 0
-  for _ in range(50000):   #try:
+  for _ in range(1200000):   #try:
     batch = nnTrackFilter.train.next_batch(100)
  #   except:
     #  tferrcount = tferrcount + 1
@@ -425,7 +455,7 @@ def main(scale, modelName):
       #pdb.set_trace()
    #   batch = nnTrackFilter.train.next_batch(100)
       #break
-    
+    #pdb.set_trace()
     tstep , rmsVal = sess.run([train_step, tf_loss],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
     if rmsVal < kilobatchMinLoss:
       kilobatchMinLoss = rmsVal
@@ -436,11 +466,15 @@ def main(scale, modelName):
     if _ == breakAtIteration:
         pdb.set_trace()
         breakAtIteration = 201
-
+    pdb.set_trace()
+    sess.graph.get_operations()
     #print('iteration: ' + str(_) + '  loss:   {0:.5f}'.format(rmsVal))
-    if _ % 50000 == 1  and _ > 10:                  # print(tf.get_default_session().run(W))
+    if _ % 20000 == 1  and _ > 10:                  # print(tf.get_default_session().run(W))
       print("kBatch Min:{0:.5f}".format(kilobatchMinLoss) + " @ " +str(kilobatchMinIt))
       print("kBatch Max:{0:.5f}".format(kilobatchMaxLoss) + " @ " +str(kilobatchMaxIt))
+      if kilobatchMaxLoss < kilobatchMinMaxLoss:
+        kilobatchMinMaxLoss =  kilobatchMaxLoss
+        kilobatchMinMaxIt = kilobatchMaxIt
       kilobatchMaxLoss = rmsVal
       kilobatchMinLoss = rmsVal
       kilobatchMaxIt = _
@@ -464,8 +498,8 @@ def main(scale, modelName):
     if rmsVal > maxLoss:
         maxLoss = rmsVal
         maxLossIteration = _
-    if (_  -  minlossIteration) > 500000:
-      break
+   # if (_  -  minlossIteration) > 500000  and  (_  -  kilobatchMinMaxIt) > 500000:
+  #    break
       #print('sum Square:',  str(pisumSq))
       #pims = (pisumSq/6)
       #print('pi-mean-Sq: {0:.3f}'.format(pims))
@@ -481,6 +515,7 @@ def main(scale, modelName):
   accuracy = tf.reduce_mean(tf.square(y_- trues_ph))
   batch = nnTrackFilter.validation.next_batch(10000)
   acc, predicks, troos = sess.run([accuracy,y_, trues_ph,],feed_dict={measureds_ph : batch[0], trues_ph: batch[1]})
+  print('*************validation test for ' +  modelName + ' with ' + scale + 'scaling')
   print('accuracy10k:' + str(acc))
   if scale == 'lin':
     for mm in range(10):
@@ -536,7 +571,7 @@ def testLogScale():
   
 if __name__ == "__main__":
   for dd in range(1):
-    main('log','5sig1matmul')
+    main('lin','8sig1matmul')
   #codeModelTest(False)
 
 """

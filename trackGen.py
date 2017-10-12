@@ -1,4 +1,4 @@
-# Generate track data
+import random# Generate track data
 
 from __future__ import absolute_import
 from __future__ import division
@@ -22,6 +22,7 @@ rocketThrustTimeMin=  30 #seconds
 rocketThrusTimetMax = 60
 rocketAzimuthMax = 80  #degrees
 rocketAzimuthMin = 60
+startTrain = 5
 
 def _float32_feature(value):
   return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
@@ -83,6 +84,11 @@ def fire(trkID):
     measSix.append(vxm)
     measSix.append(vym)
     measSix.append(vzm)
+    measSix.append(ti/1.0)
+    if ti < startTrain +1:
+      measSix.append(1.0)
+    else:
+      measSix.append(0.0)            
     trues.append(trueSix)
     measureds.append(measSix)
     #print('lenm6:', str(len(measureds)))
@@ -100,17 +106,18 @@ def fire(trkID):
       vz_max = abs(vz) 
     #print("%.1f" % xm,"%.1f" % ym,"%.1f" % zm, "%.1f" % vxm, "%.1f" % vym, "%.1f" % vzm)
     if z < 0:
-      print(ti)      
+      print(ti, x , y, z)      
       break
-  #pdb.set_trace()    
+
   #print(x_max,y_max,z_max)
   if (filetype11 == 'pkl') :
     outputData = []
     inputData = []
     for  kk in range(5, ti-3):
-      inputSix= measureds[kk-1] + measureds[kk]
+        #pdb.set_trace()    
+      inputSix=  measureds[kk] + measureds[kk-1] [0:6] 
       outputSix = trues[kk+2] 
-      print(measureds[kk][0], trues[kk+2][0])
+      #print(measureds[kk][0], trues[kk+2][0])
       inputData.append(inputSix)
       outputData.append(outputSix)
   #print(outputData)
